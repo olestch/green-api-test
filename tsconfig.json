@@ -6,5 +6,5 @@
     "esModuleInterop": true, "allowImportingTsExtensions": true,
     "types": ["node", "vite/client"]
   },
-  "include": ["src", "netlify", "tests", "vite.config.ts"]
+  "include": ["src", "tests", "vite.config.ts"]
 }
