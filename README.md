@@ -1,17 +1,19 @@
 # green-api-test
 
-A small MAX text messenger using React, TypeScript, Vite, SCSS/BEM and one Netlify Function. Russian UI, multiple chats, search, phone resolution, Enter/Shift+Enter composer, automatic incoming messages and mobile back navigation. No database or state library.
+Небольшой текстовый клиент MAX на React, TypeScript и Vite, со стилями SCSS/BEM и одной Netlify Function. Интерфейс на русском языке: несколько чатов, поиск, определение получателя по телефону, отправка через Enter, перенос строки через Shift+Enter, автоматическое получение сообщений и возврат к списку чатов на мобильных устройствах. База данных и сторонняя библиотека управления состоянием не используются.
 
-## Install and run
+## Установка и запуск
 
-Use Node 22.12+ (or Node 24):
+Требуется Node 22.12+ или Node 24:
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open http://localhost:8888. Netlify Dev runs Vite and the function together; `npm run dev:ui` alone cannot connect to GREEN-API. No Netlify account or environment secrets are needed for local development.
+Откройте http://localhost:8888. Netlify Dev одновременно запускает Vite и серверную функцию. Команда `npm run dev:ui` сама по себе не обеспечивает подключение к GREEN-API. Для локальной разработки не нужны учётная запись Netlify или секреты в переменных окружения.
+
+Команды проверки:
 
 ```sh
 npm test
@@ -19,42 +21,50 @@ npm run typecheck
 npm run build
 ```
 
-## Connect GREEN-API MAX
+## Подключение GREEN-API MAX
 
-1. Create and authorize a **MAX** instance in the [GREEN-API console](https://console.green-api.com/).
-2. Enable incoming message notifications (`incomingWebhook: yes`), clear `webhookUrl`, save and allow about a minute for settings to apply. Use only this application as the instance's notification consumer.
-3. Copy `idInstance`, `apiTokenInstance` and **apiUrl** from the console into the connection form. Supported hosts: `https://<digits>.api.green-api.com` and `https://api.green-api.com`. Do not guess the host from the instance ID.
-4. Click “Подключиться”, then + and enter an RF (+7) or Belarus (+375) phone number. Domestic RF 8 is normalized to 7. The documented `checkAccount` resolves the actual MAX `chatId`; phone visibility/privacy restrictions can prevent lookup.
+1. Создайте и авторизуйте инстанс **MAX** в [личном кабинете GREEN-API](https://console.green-api.com/).
+2. Включите уведомления о входящих сообщениях (`incomingWebhook: yes`), очистите `webhookUrl`, сохраните настройки и подождите около минуты, пока изменения вступят в силу. Только это приложение должно получать уведомления данного инстанса из очереди.
+3. Скопируйте `idInstance`, `apiTokenInstance` и **apiUrl** из кабинета в форму подключения. Поддерживаются адреса `https://<digits>.api.green-api.com` (вместо `<digits>` — цифры) и `https://api.green-api.com`. Не определяйте адрес сервера самостоятельно по идентификатору инстанса.
+4. Нажмите «Подключиться», затем + и введите номер России (+7) или Беларуси (+375). Начальная 8 в российском номере из 11 цифр заменяется на 7. Документированный метод `checkAccount` получает настоящий `chatId` пользователя MAX. Настройки приватности и доступности поиска по телефону могут помешать определению получателя.
 
-Credentials remain in tab memory and are sent as JSON to the same-origin HTTPS function. They are never stored in localStorage, server state or application logs. GREEN-API itself requires the token in its upstream URL path; that URL is constructed only on the server and errors are sanitized. Avoid enabling request-body or upstream-URL logging in hosting instrumentation.
+Учётные данные остаются в памяти вкладки и передаются в формате JSON серверной функции по HTTPS на том же источнике, с которого открыто приложение. Они не сохраняются в localStorage, серверном состоянии или журналах приложения. Сам GREEN-API требует передавать токен в пути URL запроса к своему серверу. Такой URL формируется только на сервере приложения, а сообщения об ошибках очищаются от потенциально чувствительных данных. Не включайте запись тел запросов или URL исходящих запросов в средствах мониторинга хостинга.
 
-## API behavior
+## Работа с API
 
-Verified against official MAX documentation: [request format](https://green-api.com/v3/docs/request-format/), [connection state](https://green-api.com/v3/docs/api/account/GetStateInstance/), [phone lookup](https://green-api.com/v3/docs/api/service/CheckAccount/), [send text](https://green-api.com/v3/docs/api/sending/SendMessage/), [HTTP reception and settings](https://green-api.com/v3/docs/api/receiving/technology-http-api/), [receive](https://green-api.com/v3/docs/api/receiving/technology-http-api/ReceiveNotification/), [acknowledge](https://green-api.com/v3/docs/api/receiving/technology-http-api/DeleteNotification/), [text payload](https://green-api.com/v3/docs/api/receiving/notifications-format/incoming-message/TextMessage/), [URL text payload](https://green-api.com/v3/docs/api/receiving/notifications-format/incoming-message/ExtendedTextMessage/).
+Интеграция сверена с официальной документацией MAX: [формат запросов](https://green-api.com/v3/docs/request-format/), [состояние инстанса](https://green-api.com/v3/docs/api/account/GetStateInstance/), [поиск по телефону](https://green-api.com/v3/docs/api/service/CheckAccount/), [отправка текста](https://green-api.com/v3/docs/api/sending/SendMessage/), [получение через HTTP и настройки](https://green-api.com/v3/docs/api/receiving/technology-http-api/), [получение уведомления](https://green-api.com/v3/docs/api/receiving/technology-http-api/ReceiveNotification/), [подтверждение уведомления](https://green-api.com/v3/docs/api/receiving/technology-http-api/DeleteNotification/), [формат текстового сообщения](https://green-api.com/v3/docs/api/receiving/notifications-format/incoming-message/TextMessage/), [формат текста с URL](https://green-api.com/v3/docs/api/receiving/notifications-format/incoming-message/ExtendedTextMessage/).
 
-Sending is limited to 4000 characters (conservative JavaScript UTF-16 length). `idMessage` means queued by the API, so the UI shows “В очереди API”, never claims delivery. A failed/ambiguous request is not automatically resent. Incoming text and extended text route by `senderData.chatId`; IDs are deduplicated per chat. Notifications are processed before acknowledgement. Unsupported events are intentionally acknowledged and discarded. Failed acknowledgements retry through the queue without duplicating messages.
+Длина отправляемого текста ограничена 4000 символами: для надёжности используется длина строки JavaScript в кодовых единицах UTF-16. Получение `idMessage` означает постановку сообщения в очередь API, поэтому интерфейс показывает «В очереди API» и не утверждает, что сообщение доставлено. Запрос с ошибкой или неопределённым результатом автоматически не повторяется. Входящие обычные и расширенные текстовые сообщения распределяются по чатам через `senderData.chatId`; повторные идентификаторы отбрасываются отдельно для каждого чата. Уведомления обрабатываются до подтверждения. Неподдерживаемые события намеренно подтверждаются и отбрасываются. Если подтверждение не удалось, уведомление повторно получается из очереди без дублирования сообщения в интерфейсе.
 
-Polling uses a 5-second server wait plus 700ms between completed requests (5s on error), with no overlapping requests in a session. Disconnect/unmount aborts requests and cancels timers. Each function invocation is a regular HTTP request; no background server process is used.
+Опрос использует ожидание ответа сервера до 5 секунд и паузу 700 мс после завершения запросов; при ошибке пауза составляет 5 секунд. Запросы опроса в рамках одной сессии не перекрываются. При отключении или размонтировании компонента запросы прерываются, таймеры отменяются. Каждый вызов функции — обычный HTTP-запрос; фоновый серверный процесс не используется.
 
-## Netlify deployment
+## Развёртывание на Netlify
 
-Create a new public GitHub repository named `green-api-test` under your account **only if it does not already exist**. Repository creation was unavailable through the connected GitHub tool, so no remote repository was created or pushed.
-
-This folder is ready to publish. After creating the empty repository:
+Репозиторий проекта: [olestch/green-api-test](https://github.com/olestch/green-api-test). Для получения проекта:
 
 ```sh
-git remote add origin https://github.com/YOUR_ACCOUNT/green-api-test.git
+git clone https://github.com/olestch/green-api-test.git
+cd green-api-test
+npm ci
+```
+
+Если вы работаете с исходной локальной копией, у которой ещё не настроен удалённый репозиторий, подключите существующий репозиторий и отправьте ветку:
+
+```sh
+git remote add origin https://github.com/olestch/green-api-test.git
 git push -u origin main
 ```
 
-In Netlify, import that repository. `netlify.toml` configures `npm run build`, publish directory `dist`, functions directory `netlify/functions`, Node 22 and SPA routing. No environment variables are needed. Use the resulting HTTPS URL; enter credentials in the application.
+Если `origin` уже настроен, повторять `git remote add` не нужно. Перед отправкой в непустой удалённый репозиторий получите и объедините его историю; не используйте принудительную отправку.
 
-## Limitations and manual verification
+В Netlify импортируйте этот GitHub-репозиторий и выберите ветку `main`. Файл `netlify.toml` задаёт команду сборки `npm run build`, каталог публикации `dist`, каталог функций `netlify/functions`, Node 22 и перенаправление маршрутов SPA на `index.html`. Дополнительные переменные окружения не нужны. После развёртывания откройте выданный HTTPS-адрес и введите учётные данные в приложении.
 
-Validation completed: TypeScript check and Vite production build passed; all five Node tests passed. Headless Edge checks passed for connection, multiline sending, multiple-chat routing, duplicate notification handling, acknowledgements, non-overlapping polling, mobile/back navigation, disconnect cancellation and absence of persistent token storage. The local Netlify Dev server loaded the function and responded to a validation request.
+## Ограничения и ручная проверка
 
-No real credentials were supplied: live authorization, phone lookup, send/receive, account privacy restrictions and real Netlify hosting remain to be verified. Unit tests mock the upstream API; they do not demonstrate real message delivery. Browser checks also use mocked API responses.
+Выполненные проверки: проверка типов TypeScript и сборка Vite для публикации прошли успешно; все пять тестов Node прошли. Проверки в Edge без графического окна подтвердили подключение, отправку многострочного текста, распределение сообщений между чатами, обработку повторных уведомлений, подтверждения, отсутствие перекрывающихся запросов опроса, мобильную навигацию и возврат к чатам, отмену опроса при отключении и отсутствие постоянного хранения токена. Локальный сервер Netlify Dev загрузил функцию и ответил на запрос проверки входных данных.
 
-History and credentials disappear on reload/disconnect. Only text messages are displayed; attachments and message edits/deletions/status notifications are discarded. No historical synchronization, read receipts or delivery tracking. One active tab/consumer per instance. Background-tab throttling can delay polling. Reloading loses messages already acknowledged to GREEN-API; this is intentional for the memory-only MVP.
+Настоящие учётные данные не предоставлялись. Авторизацию, поиск по телефону, отправку и получение сообщений, влияние настроек приватности аккаунта и работу на реальном хостинге Netlify ещё нужно проверить. Модульные тесты подменяют ответы внешнего API и не подтверждают реальную доставку сообщений. Браузерные проверки также используют подменённые ответы API.
 
-Manual smoke check: connect a real authorized MAX instance; create two chats; send with Enter and multiline with Shift+Enter; reply from each phone and check routing; disconnect during polling; verify invalid credentials, an unavailable recipient, empty/4001-character input, API/network failures, and the mobile back button. If a send times out, check MAX before retrying to avoid sending twice.
+История и учётные данные исчезают при перезагрузке страницы или отключении. Отображаются только текстовые сообщения; вложения и уведомления об изменении, удалении и статусах сообщений отбрасываются. Синхронизация истории, отметки прочтения и отслеживание доставки не реализованы. Для одного инстанса допустима одна активная вкладка или один получатель уведомлений из очереди. Ограничение активности фоновых вкладок браузером может задерживать опрос. При перезагрузке теряются сообщения, получение которых уже подтверждено GREEN-API: это ожидаемое поведение MVP с хранением только в памяти.
+
+Ручная проверка: подключите настоящий авторизованный инстанс MAX; создайте два чата; отправьте сообщение через Enter и многострочное сообщение через Shift+Enter; ответьте с каждого телефона и проверьте распределение по чатам; отключитесь во время опроса. Проверьте неверные учётные данные, недоступного получателя, пустой ввод и текст из 4001 символа, ошибки API и сети, а также мобильную кнопку возврата. Если отправка завершилась по тайм-ауту, перед повтором проверьте MAX, чтобы не отправить сообщение дважды.
